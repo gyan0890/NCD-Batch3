@@ -26,7 +26,7 @@ echo --------------------------------------------
 echo
 echo "redeploying the contract"
 echo
-near dev-deploy ./build/release/sample.wasm
+near dev-deploy ./build/release/cointoss.wasm
 
 echo --------------------------------------------
 echo run the following commands
