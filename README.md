@@ -1,71 +1,35 @@
-# Sample
+# Coin-Toss-Demo
 
-This repository includes a complete project structure for AssemblyScript contracts targeting the NEAR platform.
-
-Watch this video where Willem Wyndham walks us through refactoring a simple example of a NEAR smart contract written in AssemblyScript
-
-https://youtu.be/QP7aveSqRPo
-
-```
-There are 2 "styles" of implementing AssemblyScript NEAR contracts: 
-- the contract interface can either be a collection of exported functions 
-- or the contract interface can be the methods of a an exported class
-
-We call the second style "Singleton" because there is only one instance of the class which is serialized to the blockchain storage.  Rust contracts written for NEAR do this by default with the contract struct.
-
- 0:00 noise (to cut)
- 0:10 Welcome
- 0:59 Create project starting with "npm init"
- 2:20 Customize the project for AssemblyScript development
- 9:25 Import the Counter example and get unit tests passing
-18:30 Adapt the Counter example to a Singleton style contract
-21:49 Refactoring unit tests to access the new methods
-24:45 Review and summary
-```
-
-The example here is very basic.  It's a simple contract demonstrating the following concepts:
-- a single contract
-- the difference between `view` vs. `change` methods
-- basic contract storage
-
-The goal of this repository is to make it as easy as possible to get started writing unit and simulation tests for AssemblyScript contracts built to work with NEAR Protocol.
+This repository includes a coin-toss-demo project using AssemblyScript contracts targeting the NEAR platform.
 
 ## Usage
+In this project, you can run the contracts to play a game of coin-toss between any two near accounts. The results of the game are randomly declared.
 
 ### Getting started
 
 1. clone this repo to a local folder
 2. run `yarn`
-3. run `yarn test`
-
-### Top-level `yarn` commands
-
-- run `yarn test` to run all tests
-  - (!) be sure to run `yarn build:release` at least once before:
-    - run `yarn test:unit` to run only unit tests
-    - run `yarn test:simulate` to run only simulation tests
-- run `yarn build` to quickly verify build status
-- run `yarn clean` to clean up build folder
-
-### Other documentation
-
-- Sample contract and test documentation
-  - see `/src/sample/README` for contract interface
-  - see `/src/sample/__tests__/README` for Sample unit testing details
-
-- Sample contract simulation tests
-  - see `/simulation/README` for simulation testing
 
 
-## The file system
+### Steps to run the project
+1. Run the ./scripts/1.init.sh script to deploy the contract. Copy the contract address geenerated as dev-1234-123(for example) and set it
+to point to the contract variable by setting export CONTRACT=dev-1234-123
+2. Run the ./scripts/2.init.sh script to create a game. You can modify the amount of NEAR that you want to lock in the game by changing the --amount flag set in line 14. Default is 15 NEAR. 
+3. The above script will return a gameId. Open another terminal to run the other scripts as you would need this gameId to call all the other contract functions.
+4. Copy the gameId and replace it as the parameter in scripts 3.run.sh and 4.run.sh wherever you find the arguments {"gameId": "Your Newly Generated GameID"}
+5. Run the script 3.run.sh - This will return a guesser as the output of the last call.
+6. Copy the guesser wallet and paste it in script 4.run.sh at line : makeAGuess ... --account_id "Guesser Name". You can also change the "guess" variable to "true"/"false".
+7. Run the script 4.run.sh and you will get a winner name at the end.
+8. You can check the seecond last transaction ID returned as a result of 4.run.sh in the explorer to check if the total amount of NEAR were transferred to the winner or not!
 
-Please note that boilerplate project configuration files have been ommitted from the following lists for simplicity.
+### Steps to run Unit Tests
+1. Run yarn test:unit to run the unit tests at the parent directory
 
 ### Contracts and Unit Tests
 
 ```txt
 src
-├── sample                        <-- sample contract
+├── cointoss                        <-- coin toss contract
 │   ├── README.md
 │   ├── __tests__
 │   │   ├── README.md
@@ -73,13 +37,4 @@ src
 │   └── assembly
 │       └── index.ts
 └── utils.ts                      <-- shared contract code
-```
-
-### Helper Scripts
-
-```txt
-scripts
-├── 1.init.sh
-├── 2.run.sh
-└── README.md                     <-- instructions
 ```
