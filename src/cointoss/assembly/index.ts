@@ -8,7 +8,7 @@
 // 7. Heads - mapped to even number, Tails is mapped to odd number
 // 8. Winning player gets total locked amount
 // 9. Game state is changed to unavailable/complete
-import { context, u128, PersistentVector, PersistentMap, logging, ContractPromiseBatch, RNG} from "near-sdk-as";
+import { context, u128, PersistentMap, logging, ContractPromiseBatch, RNG} from "near-sdk-as";
 
 enum GameState {
     Created,
@@ -49,19 +49,20 @@ export class Game {
 
 }
 
-export const games = new PersistentVector<Game>("g");
+export const games = new PersistentMap<u32, Game>("g");
 
 export function createGame(): u32 {
+    logging.log("Attached Deposit with this account " + context.attachedDeposit.toString());
+    logging.log("In contract");
     const game = new Game();
-    games.push(game);
+    games.set(game.id, game);
     return game.id;
 }
 
 export function joinGame(gameId: u32): boolean {
     //Loop through game Ids to check the game
-    for(let i =0; i< games.length; i++){
-        if(games[i].id == gameId){
-            const newGame = new Game();
+    const game = games.getSome(gameId);
+    if(game != null){
             /*
             Check if the game corresponds to a created game
             and if the same amount of deposit is attached.
@@ -75,24 +76,19 @@ export function joinGame(gameId: u32): boolean {
             // logging.log("Player1 is: "+ games[i].player1);
 
             //logging.log("Account Balance for this account is: "+ context.accountBalance);
-            if(context.attachedDeposit >= games[i].deposit1 
-                && games[i].gameState == GameState.Created
-                && context.sender != games[i].player1){
-                newGame.deposit1 = games[i].deposit1;
-                newGame.deposit2 = context.attachedDeposit;
-                newGame.gameState = GameState.InProgress;
-                newGame.player1 = games[i].player1;
-                newGame.player2 = context.sender;
-                newGame.id = games[i].id;
-
-                games.replace(i,newGame);
+            if(context.attachedDeposit >= game.deposit1 
+                && game.gameState == GameState.Created
+                && context.sender != game.player1){
+                    game.deposit2 = context.attachedDeposit;
+                    game.gameState = GameState.InProgress;
+                    game.player2 = context.sender;
+                games.set(game.id, game);
                 
                 return true;
             }
             else {
                 return false;
             }
-        }
     }
     return false;
 }
@@ -100,14 +96,15 @@ export function joinGame(gameId: u32): boolean {
 export function chooseGuesser(gameId: u32): string {
     const randomNumber = new RNG<u32>(1, u32.MAX_VALUE);
     const randomNum = randomNumber.next();
+    const game = games.getSome(gameId);
 
-    for(let i =0; i< games.length; i++){
-        if(games[i].id == gameId && games[i].gameState == GameState.InProgress){
+    if(game != null){
+        if(game.gameState == GameState.InProgress){
             if(randomNum % 3== 0){
-                return games[i].player1; 
+                return game.player1; 
             }
             else
-                return games[i].player2;
+                return game.player2;
             }
     }
     return "Game Not Found";
@@ -115,23 +112,18 @@ export function chooseGuesser(gameId: u32): string {
 }
 
 export function makeAGuess(gameId: u32, guess: boolean): string {
-    const newGame = new Game();
-    for(let i =0; i< games.length; i++){
-        if(games[i].id == gameId && games[i].gameState == GameState.InProgress) {
-            newGame.id = games[i].id;
-            newGame.deposit1 = games[i].deposit1;
-            newGame.deposit2 = games[i].deposit2;
-            newGame.player1 = games[i].player1;
-            newGame.player2 = games[i].player2;
-            newGame.gameState = games[i].gameState;
-            if(context.sender == games[i].player1){
-                newGame.player1Guess = guess;
+
+    const game = games.getSome(gameId);
+    if(game != null){
+        if(game.gameState == GameState.InProgress) {
+            if(context.sender == game.player1){
+                game.player1Guess = guess;
             }
             else {
-                newGame.player2Guess = guess;
+                game.player2Guess = guess;
             }
                 
-            games.replace(i,newGame);
+            games.set(game.id,game);
             return "Done"
         }
     }
@@ -142,135 +134,122 @@ export function finishGame(gameId: u32) : string {
 
   const randomNumber = new RNG<u32>(1, u32.MAX_VALUE);
   const randomNum = randomNumber.next();
-  for(let i =0; i< games.length; i++)
-  { 
-    logging.log("In the for loop - finishGame function");
-    logging.log("gameIs id: " + gameId.toString());
-      if(games[i].id == gameId && 
-        games[i].gameState == GameState.InProgress)
+  const game = games.getSome(gameId);
+   
+    // logging.log("In the for loop - finishGame function");
+    // logging.log("gameIs id: " + gameId.toString());
+      if(game != null && 
+        game.id == GameState.InProgress)
       {
-        logging.log("Found a game in progress with is:" + games[i].id.toString());
-        logging.log("Random number generated is: "+ randomNum.toString());
-        logging.log("Player 1 address is: "+ games[i].player1);
-        logging.log("Player 2 address is: "+ games[i].player2);
+        // logging.log("Found a game in progress with is:" + games[i].id.toString());
+        // logging.log("Random number generated is: "+ randomNum.toString());
+        // logging.log("Player 1 address is: "+ games[i].player1);
+        // logging.log("Player 2 address is: "+ games[i].player2);
 
         if(randomNum %3 == 0){
-          if(games[i].player2Guess == true) {
-          logging.log("Game Winner is: "+ games[i].player2);
-          const updateGame = new Game();
-          updateGame.gameState = GameState.Completed;
-          updateGame.player1 = games[i].player1;
-          updateGame.player2 = games[i].player2;
-          updateGame.deposit1 = games[i].deposit1;
-          updateGame.deposit2 = games[i].deposit2;
-          updateGame.id = games[i].id;
-          updateGame.winner = games[i].player2;
-          games.replace(i, updateGame);
+          if(game.player2Guess == true) {
+          logging.log("Game Winner is: "+ game.player2);
+          game.gameState = GameState.Completed;
+          game.winner = game.player2;
+          games.set(game.id, game);
 
           // logging.log("Game Winner is: "+ updateGame.winner);
           //Send 2*deposit to the winning player
-          const to_beneficiary = ContractPromiseBatch.create(updateGame.winner);
+          const to_beneficiary = ContractPromiseBatch.create(game.winner);
 
           //logging.log("Beneficiary is: " + to_beneficiary.id.toString());
           // logging.log("Game Deposit 1 is: "+ updateGame.deposit1.toString());
           // logging.log("Game Deposit 2 is: "+ updateGame.deposit2.toString());
-          to_beneficiary.transfer(u128.add(updateGame.deposit1, updateGame.deposit2));
-          return updateGame.winner;
+          to_beneficiary.transfer(u128.add(game.deposit1, game.deposit2));
+          return game.winner;
           }
           else {
-            logging.log("Game Winner is: "+ games[i].player1);
-            const updateGame = new Game();
-            updateGame.gameState = GameState.Completed;
-            updateGame.player1 = games[i].player1;
-            updateGame.player2 = games[i].player2;
-            updateGame.deposit1 = games[i].deposit1;
-            updateGame.deposit2 = games[i].deposit2;
-            updateGame.id = games[i].id;
-            updateGame.winner = games[i].player1;
-            games.replace(i, updateGame);
+            logging.log("Game Winner is: "+ game.player1);
+            game.gameState = GameState.Completed;
+            game.winner = game.player1;
+            games.set(game.id, game);
   
             // logging.log("Game Winner is: "+ updateGame.winner);
             //Send 2*deposit to the winning player
-            const to_beneficiary = ContractPromiseBatch.create(updateGame.winner);
+            const to_beneficiary = ContractPromiseBatch.create(game.winner);
   
             //logging.log("Beneficiary is: " + to_beneficiary.id.toString());
             // logging.log("Game Deposit 1 is: "+ updateGame.deposit1.toString());
             // logging.log("Game Deposit 2 is: "+ updateGame.deposit2.toString());
-            to_beneficiary.transfer(u128.add(updateGame.deposit1, updateGame.deposit2));
-            return updateGame.winner;
+            to_beneficiary.transfer(u128.add(game.deposit1, game.deposit2));
+            return game.winner;
           }
         }
         else {
-          if(games[i].player2Guess == false){
-          logging.log("Game Winner is: "+ games[i].player2);
-          const updateGame = new Game();
-          updateGame.gameState = GameState.Completed;
-          updateGame.player1 = games[i].player1;
-          updateGame.player2 = games[i].player2;
-          updateGame.deposit1 = games[i].deposit1;
-          updateGame.deposit2 = games[i].deposit2;
-          updateGame.id = games[i].id;
-          updateGame.winner = games[i].player2;
-          games.replace(i, updateGame);
+          if(game.player2Guess == false){
+          logging.log("Game Winner is: "+ game.player2);
+          game.gameState = GameState.Completed;
+          game.winner = game.player2;
+          games.set(game.id, game);
 
           // logging.log("Game Winner is: "+ updateGame.winner);
           //Send 2*deposit to the winning player
-          const to_beneficiary = ContractPromiseBatch.create(updateGame.winner);
+          const to_beneficiary = ContractPromiseBatch.create(game.winner);
 
           //logging.log("Beneficiary is: " + to_beneficiary.id.toString());
           // logging.log("Game Deposit 1 is: "+ updateGame.deposit1.toString());
           // logging.log("Game Deposit 2 is: "+ updateGame.deposit2.toString());
-          to_beneficiary.transfer(u128.add(updateGame.deposit1, updateGame.deposit2));
-          return updateGame.winner;
+          to_beneficiary.transfer(u128.add(game.deposit1, game.deposit2));
+          return game.winner;
         }
         else {
-          logging.log("Game Winner is: "+ games[i].player1);
-          const updateGame = new Game();
-          updateGame.gameState = GameState.Completed;
-          updateGame.player1 = games[i].player1;
-          updateGame.player2 = games[i].player2;
-          updateGame.deposit1 = games[i].deposit1;
-          updateGame.deposit2 = games[i].deposit2;
-          updateGame.id = games[i].id;
-          updateGame.winner = games[i].player1;
-          games.replace(i, updateGame);
+          logging.log("Game Winner is: "+ game.player1);
+          game.gameState = GameState.Completed;
+          game.winner = game.player1;
+          games.set(game.id, game);
 
           // logging.log("Game Winner is: "+ updateGame.winner);
           //Send 2*deposit to the winning player
-          const to_beneficiary = ContractPromiseBatch.create(updateGame.winner);
+          const to_beneficiary = ContractPromiseBatch.create(game.winner);
 
           //logging.log("Beneficiary is: " + to_beneficiary.id.toString());
           // logging.log("Game Deposit 1 is: "+ updateGame.deposit1.toString());
           // logging.log("Game Deposit 2 is: "+ updateGame.deposit2.toString());
-          to_beneficiary.transfer(u128.add(updateGame.deposit1, updateGame.deposit2));
-          return updateGame.winner;
+          to_beneficiary.transfer(u128.add(game.deposit1, game.deposit2));
+          return game.winner;
         }
     }
     }
-  }
 return 'None';
 }
 
 //Getters for all the game variables
 
 //Returns all the active games which have been created
-export function getActiveGames(): PersistentMap<u32, u128> {
+// export function getActiveGames(): Array<u32> {
   
-  let tempGamesMap = new PersistentMap<u32, u128>("t");
-  for(let i =0; i< games.length; i++){
-      if(games[i].gameState == GameState.Created){
-          tempGamesMap.set(games[i].id, games[i].deposit1);
-      }
-  }
-  return tempGamesMap;
-}
+//   let tempGamesMap = new Array<u32>();
+
+//   for(let i =0; i< games.length; i++){
+//       if(games[i].gameState == GameState.Created){
+//           tempGamesMap.push(games[i].id);
+//       }
+//   }
+//   return tempGamesMap;
+// }
+
+// export function getActiveGamesDeposit(): Array<u128> {
+  
+//     let tempGamesMap = new Array<u128>();
+  
+//     for(let i =0; i< games.length; i++){
+//         if(games[i].gameState == GameState.Created){
+//             tempGamesMap.push(games[i].deposit1);
+//         }
+//     }
+//     return tempGamesMap;
+//   }
 
 //Get the first player details
 export function getPlayer1Details(gameId: i32): string {
-    for(let i =0; i< games.length; i++){
-        if(games[i].id == gameId){
-            return games[i].player1;
-        }
+    const game = games.getSome(gameId);
+    if(game != null){
+            return game.player1;
     }
     return "None";
 }
@@ -278,42 +257,36 @@ export function getPlayer1Details(gameId: i32): string {
 
 //Get the second player details
 export function getPlayer2Details(gameId: i32): string {
-    for(let i =0; i< games.length; i++){
-        if(games[i].id == gameId){
-            return games[i].player2;
-        }
+    const game = games.getSome(gameId);
+    if(game != null){
+            return game.player2;
     }
     return "None";
 }
 
 //Get the deposit deetails
 export function getDeposit(gameId: i32): u128 {
-    for(let i =0; i< games.length; i++){
-        if(games[i].id == gameId){
-            return games[i].deposit1;
-        }
+    const game = games.getSome(gameId);
+    if(game != null){
+            return game.deposit1;
     }
     return u128.Zero;
 }
 
 //Get the Game State
 export function getGameState(gameId: i32): GameState {
-    for(let i =0; i< games.length; i++){
-        if(games[i].id == gameId){
-            return games[i].gameState;
-        }
+    const game = games.getSome(gameId);
+    if(game != null){
+            return game.gameState;
     }
     return GameState.NotFound;
 }
 
 //Get the winner of the game
 export function getWinner(gameId: i32): string {
-    for(let i =0; i< games.length; i++){
-        if(games[i].id == gameId){
-            if(games[i].gameState == GameState.Completed){
-                return games[i].winner;
-            }
-        }
+    const game = games.getSome(gameId);
+    if(game != null && game.gameState == GameState.Completed){
+            return game.winner;
     }    
     return "None";
 }
